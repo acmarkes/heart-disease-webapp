@@ -3,25 +3,20 @@ import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
+from random import randint
 from scipy import stats
 from sklearn import metrics
-from sklearn import svm
+from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectKBest, chi2, f_classif
+
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import KFold  # For K-fold cross validation
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.metrics import mean_squared_error
-from sklearn.feature_selection import SelectKBest
-from sklearn.feature_selection import chi2
-from sklearn.feature_selection import f_classif
-from sklearn.model_selection import cross_val_score
-from random import randint
+from sklearn.metrics import accuracy_score, mean_squared_error
+
+from sklearn.model_selection import KFold, train_test_split, cross_val_score, GridSearchCV
 
 
 #%%
@@ -57,24 +52,20 @@ col_names = ['age', 'sex',
 						-- Value 1: > 50% diameter narrowing
 """
 
-
 url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/'
 hungarian_url = f'{url}processed.hungarian.data'
 cleve_url = f'{url}processed.cleveland.data'
 swiss_url = f'{url}processed.switzerland.data'
 va_url = f'{url}processed.va.data'
 
-hungarian_df = pd.read_csv(hungarian_url, index_col = False,names=col_names)
+#TOO MANY NULL VALUES TO BE OF USE
+#hungarian_df = pd.read_csv(hungarian_url, index_col = False,names=col_names)
+#swiss_df = pd.read_csv(swiss_url,index_col = False, names=col_names)
+#va_df = pd.read_csv(va_url,index_col = False, names=col_names)
+#merged_df = pd.concat([cleve_df, hungarian_df,swiss_df,va_df], ignore_index=True)
+
 cleve_df = pd.read_csv(cleve_url,index_col = False, names=col_names)
-swiss_df = pd.read_csv(swiss_url,index_col = False, names=col_names)
-va_df = pd.read_csv(va_url,index_col = False, names=col_names)
-merged_df = pd.concat([hungarian_df,swiss_df,va_df], ignore_index=True)
-
-
-dfs = [hungarian_df, cleve_df,swiss_df,va_df]
-places = ['Hungary','Cleveland','Switzerland','Long Beach']
-for (frame,place) in zip(dfs,places):
-    frame.columns.name = place
+cleve_df.columns.name = 'Cleveland'
 
 #%%
 #QUICK DF LOOKUP
@@ -83,18 +74,23 @@ def peek(frame):
     print(frame.head())
     print("-"*80)
     print("Its columns are:")
-    print(frame.dtypes)
+    print(frame.info())
     print("-"*80)
     print("Here are its statistical characteristics:")
-    print(frame.describe())
+    print(frame.describe(include='all'))
     #frame.groupby('num').size()
 
 #%%   
 #QUICK HEATPLOT GENERATION
-def heatplot(frame):
-    k = 7 #number of variables for heatmap
+def heatplot(frame, target, k=frame.shape[1]-1):
+    """
+    Function to generate a heatmap of your dataframe
+    frame: dataframe to be used
+    target: main target of your interest, all correlations will be calculated but this attribute will be the first
+    k = number of variables to show, top k highest correlations (closest to -1 or 1) will show, default is (Num of Frame Attributes - 1) 
+    """
     corrMatrix = frame.dropna().corr()
-    cols = corrMatrix.nlargest(k, 'num')['num'].index
+    cols = corrMatrix.abs().nlargest(k, target)[target].index
     cm = np.corrcoef(frame[cols].values.T)
     mask = np.zeros_like(cm)
     mask[np.triu_indices_from(mask)] = True
@@ -109,7 +105,7 @@ def heatplot(frame):
                     vmax= 0.6,
                     vmin= -0.6)
     plt.show() 
-
+    return cols.to_list()
 
 #%%
 def feature_scaling(method, frame, columns=None):
@@ -141,8 +137,8 @@ def preprocessing(frame):
     try:
         frame['thal'].replace({"?":np.nan}, inplace=True)
         frame['ca'].replace({"?":np.nan}, inplace=True)
-        frame.dropna(subset= ['cp','ca','thal'],inplace=True)
-        frame[['cp','ca','thal']]= frame[['cp','ca','thal']].astype('category')
+        frame.dropna(subset = ['cp','ca','thal'],inplace=True)
+        frame[['cp','ca','thal']] = frame[['cp','ca','thal']].astype('category')
         frame.loc[frame['num'] > 1, 'num'] = 1
     except:
         pass
@@ -150,7 +146,8 @@ def preprocessing(frame):
 
     cols = list(frame.columns.values) #Make a list of all of the columns in the df
     cols.pop(cols.index('num')) #Remove b from list
-    frame = frame[cols+['num']] #Create new dataframe with columns in the order you want
+    frame = frame[cols+['num']] #Create new dataframe with columns in the wanted order
+
 
     frame.dropna(inplace=True)
 
@@ -188,7 +185,6 @@ def classification_model(model, data, predictors, outcome, folds = 5, seed = ran
 
         #Fit the model again so it can be referred outside the function
         model.fit(data[predictors],data[outcome])
-
 
 
 #%%
@@ -245,18 +241,41 @@ print(feature_ranking(cleve_df)['importances'])
 #%%
 
 data = cleve_df
-model_1 = LogisticRegression(max_iter=800)
-predictors_1 = feature_ranking(cleve_df,5)['scores']
-model_2 = RandomForestClassifier(n_estimators=25, min_samples_split=25,max_depth=7,max_features=1)
-predictors_2 = feature_ranking(cleve_df,5)['importances']
-model_3 = svm.SVC(kernel='linear', C=1, random_state=42)
+
+#models
+logis = LogisticRegression(max_iter=800)
+rndf = RandomForestClassifier()
+supv = SVC()
+models = [logis,rndf,supv]
+
+#predictors
+corrs = ['thal_3.0','cp_4.0','ca_0.0','thal_7.0','exang','slope']
+scores = feature_ranking(cleve_df,5)['scores']
+importances = feature_ranking(cleve_df,5)['importances']
+predictors = [corrs,scores,importances]
+
+#target
 outcome = 'num'
 
 #%%
-classification_model(model_1,data,predictors_1,outcome,seed = 132)
-classification_model(model_2,data,predictors_2,outcome,seed = 132)
-classification_model(model_3,data,predictors_1,outcome,seed = 132)
+for model in models:
+    for p in predictors:
+        print(model)
+        print(p)
+        print('-'*50)
+        classification_model(model,data,p,outcome,seed = 132)
+        print('-'*50)
 
+
+#Best model = supv
+#Best predictors = corrs
+
+#%%
+#Tuning SVC hyperparameters
+parameters = {'kernel':('linear', 'rbf'), 'C':[1, 2, 3], 'probability':[True]}
+clf = GridSearchCV(supv, parameters)
+clf.fit(data.iloc[:,0:-1], data.iloc[:,-1])
+supv = clf.best_estimator_
 
 # %%
 X = data.iloc[:,0:-1]
@@ -267,10 +286,10 @@ seed = 17
 
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_size,
 random_state=seed)
-model = model_1.fit(X_train, Y_train)
+model = supv.fit(X_train[corrs], Y_train)
 
 #%%
-result = model.score(X_test, Y_test)
+result = model.score(X_test[corrs], Y_test)
 print(result*100.0)
 
 
@@ -280,8 +299,13 @@ seed = 7
 kfold = KFold(n_splits=num_folds, shuffle=True, random_state=seed)
 results = cross_val_score(model, X, Y, cv=kfold)
 print(results.mean()*100.0, results.std()*100.0)
+
 # %%
+corrs.append('sex')
+corrs.append('age')
+model = supv.fit(X[corrs], Y)
 
 import pickle
 pickle.dump(model, open('heartd_clf.pkl', 'wb'))
 # %%
+['thal_3.0', 'cp_4.0', 'ca_0.0', 'thal_7.0', 'exang', 'slope']

@@ -22,12 +22,16 @@ def user_input_features():
     thal = st.sidebar.selectbox('Defects',('normal','fixed defects','reversable defect'))
     ca = st.sidebar.slider('Number of major vessels (0-3) colored by flourosopy', min_value=0, max_value=3)
     cp = st.sidebar.selectbox('Chest pain',('typical angina','atypical angina','non-anginal pain','asymptomatic'))
+    exang = st.sidebar.selectbox('Exercise induced angina',('yes','no'))
+    slope = st.sidebar.slider('Slope of the peak exercise ST segment', min_value=1, max_value=3)
 
     data = {'sex': sex,
             'age': age,
             'thal': thal,
             'ca': ca,
-            'cp': cp}
+            'cp': cp,
+            'exang':exang,
+            'slope':slope}
     features = pd.DataFrame(data, index=[0])
     return features
 input_df = user_input_features()
@@ -47,23 +51,23 @@ heartd_raw = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databa
 heartd = heartd_raw.drop(columns=['num'])
 
 #Join the user input to the dataframe
-df = pd.concat([input_df,heartd.iloc[0:100,:]],axis=0)
+df = pd.concat([input_df,heartd],axis=0)
 
 #Filling the null values with 0
 df.fillna(0,inplace=True)
 
 # Display the user input features
 st.subheader('User Input features')
-st.dataframe(df.iloc[:1,:5])
+st.dataframe(df.iloc[:1,:7])
 
 #Replace values
 df['sex'].replace({'Male':1,'Female':0},inplace=True)
 df['thal'].replace({'normal':3, 'fixed defect':6, 'reversable defect':7},inplace=True)
 df['cp'].replace({'typical angina':1,'atypical angina':2,'non-anginal pain':3,'asymptomatic':4},inplace=True)
-
+df['exang'].replace({'yes':1,'no':0},inplace=True)
 
 #Encode the features
-encode = ['thal','cp']
+encode = ['thal','cp','ca']
 for col in encode:
     dummy = pd.get_dummies(df[col], prefix=col)
     df = pd.concat([df,dummy], axis=1)
@@ -71,6 +75,7 @@ for col in encode:
 
 df = df[:1] # Selects only the first row (the user input data)
 df['error_fix'] = 0
+df = df[['thal_3.0', 'cp_4.0', 'ca_0.0', 'thal_7.0', 'exang', 'slope']]
 
 # Reads in saved classification model
 load_clf = pickle.load(open('heartd_clf.pkl', 'rb'))
@@ -81,8 +86,8 @@ prediction_proba = load_clf.predict_proba(df)
 
 
 st.subheader('Prediction')
-diagnosis = np.array(['< 50% diameter narrowing','> 50% diameter narrowing'])
-st.write(diagnosis[prediction])
+diagnosis = np.array(['< 50% diameter narrowing','\> 50% diameter narrowing'])
+st.write(diagnosis[prediction][0])
 
 st.subheader('Prediction Probability')
 st.write(prediction_proba)
