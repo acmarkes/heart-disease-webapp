@@ -91,3 +91,5 @@ st.write(diagnosis[prediction][0])
 
 st.subheader('Prediction Probability')
 st.write(prediction_proba)
+
+st.markdown('<sub>*App built by Andrew Marques*[(*github*)] (https://github.com/acmarkes).</sub>', unsafe_allow_html=True)

@@ -4,8 +4,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 from random import randint
-from scipy import stats
-from sklearn import metrics
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder
@@ -163,7 +161,7 @@ def classification_model(model, data, predictors, outcome, folds = 5, seed = ran
     predictions = model.predict(data[predictors])
 
     #Print accuracy
-    accuracy = metrics.accuracy_score(predictions,data[outcome])
+    accuracy = accuracy_score(predictions,data[outcome])
     print(f"Accuracy: {accuracy*100:.4f}% (0:.3%)")
 
     #Perform k-fold cross-validation with 5 folds
@@ -301,8 +299,6 @@ results = cross_val_score(model, X, Y, cv=kfold)
 print(results.mean()*100.0, results.std()*100.0)
 
 # %%
-corrs.append('sex')
-corrs.append('age')
 model = supv.fit(X[corrs], Y)
 
 import pickle
