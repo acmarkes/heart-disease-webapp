@@ -2,7 +2,7 @@
 
 Demonstration of the Streamlit library for deployment of machine learning predictive models. 
 
-You can use the app at https://heartd-app.herokuapp.com/.
+You can use the app [here](https://share.streamlit.io/acmarkes/heart-disease-webapp/main/heartd-app.py).
 
 The data used for the training of the model can be found on the [UCI ML Repository](https://archive.ics.uci.edu/ml/datasets/heart+disease). Given the small amount of data and my lack of expertise in healthcare, the results given by the model should in no way serve as substitute for the diagnosis made by an actual medical professional.
 
