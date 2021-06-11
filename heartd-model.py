@@ -51,16 +51,8 @@ col_names = ['age', 'sex',
 """
 
 url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/'
-hungarian_url = f'{url}processed.hungarian.data'
-cleve_url = f'{url}processed.cleveland.data'
-swiss_url = f'{url}processed.switzerland.data'
-va_url = f'{url}processed.va.data'
 
-#TOO MANY NULL VALUES TO BE OF USE
-#hungarian_df = pd.read_csv(hungarian_url, index_col = False,names=col_names)
-#swiss_df = pd.read_csv(swiss_url,index_col = False, names=col_names)
-#va_df = pd.read_csv(va_url,index_col = False, names=col_names)
-#merged_df = pd.concat([cleve_df, hungarian_df,swiss_df,va_df], ignore_index=True)
+cleve_url = f'{url}processed.cleveland.data'
 
 cleve_df = pd.read_csv(cleve_url,index_col = False, names=col_names)
 cleve_df.columns.name = 'Cleveland'
@@ -77,33 +69,6 @@ def peek(frame):
     print("Here are its statistical characteristics:")
     print(frame.describe(include='all'))
     #frame.groupby('num').size()
-
-#%%   
-#QUICK HEATPLOT GENERATION
-def heatplot(frame, target, k=frame.shape[1]-1):
-    """
-    Function to generate a heatmap of your dataframe
-    frame: dataframe to be used
-    target: main target of your interest, all correlations will be calculated but this attribute will be the first
-    k = number of variables to show, top k highest correlations (closest to -1 or 1) will show, default is (Num of Frame Attributes - 1) 
-    """
-    corrMatrix = frame.dropna().corr()
-    cols = corrMatrix.abs().nlargest(k, target)[target].index
-    cm = np.corrcoef(frame[cols].values.T)
-    mask = np.zeros_like(cm)
-    mask[np.triu_indices_from(mask)] = True
-    sns.set(font_scale=1.25)
-    hm = sns.heatmap(cm, cbar=True, annot=True, 
-                    square=True, fmt='.2f',
-                    mask=mask, 
-                    annot_kws={'size': 8},
-                    linewidths=.5, 
-                    yticklabels=cols.values, 
-                    xticklabels=cols.values,
-                    vmax= 0.6,
-                    vmin= -0.6)
-    plt.show() 
-    return cols.to_list()
 
 #%%
 def feature_scaling(method, frame, columns=None):
@@ -237,7 +202,6 @@ cleve_df.dropna(inplace=True)
 print(feature_ranking(cleve_df)['importances'])
 
 #%%
-
 data = cleve_df
 
 #models
